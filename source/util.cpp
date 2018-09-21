@@ -720,35 +720,32 @@ void fmt_lower(const char *text, std::string *ret_formatted)
 	{
 		char c = text[0];
 		
-		switch(c)
-		{
-			if(c == 'Á') c = 'á';
-			else if(c == 'À') c = 'à';
-			else if(c == 'Ä') c = 'ä';
-			else if(c == 'Â') c = 'â';
-			else if(c == 'É') c = 'é';
-			else if(c == 'È') c = 'è';
-			else if(c == 'Ë') c = 'ë';
-			else if(c == 'Ê') c = 'ê';
-			else if(c == 'Í') c = 'í';
-			else if(c == 'Ì') c = 'ì';
-			else if(c == 'Ï') c = 'ï';
-			else if(c == 'Î') c = 'î';
-			else if(c == 'Ó') c = 'ó';
-			else if(c == 'Ò') c = 'ò';
-			else if(c == 'Ö') c = 'ö';
-			else if(c == 'Ô') c = 'ô';
-			else if(c == 'Ú') c = 'ú';
-			else if(c == 'Ù') c = 'ù';
-			else if(c == 'Ü') c = 'ü';
-			else if(c == 'Û') c = 'û';
-			else if(c == 'Ý') c = 'ý';
-			else if(c == 'Ñ') c = 'ñ';
-			else if(c == 'Ç') c = 'ç';
-			else if(c == 'Ø') c = 'ø';
-			else if(c == 'Æ') c = 'æ';
-			else c = tolower(c);
-		}
+		if(c == 'Á') c = 'á';
+		else if(c == 'À') c = 'à';
+		else if(c == 'Ä') c = 'ä';
+		else if(c == 'Â') c = 'â';
+		else if(c == 'É') c = 'é';
+		else if(c == 'È') c = 'è';
+		else if(c == 'Ë') c = 'ë';
+		else if(c == 'Ê') c = 'ê';
+		else if(c == 'Í') c = 'í';
+		else if(c == 'Ì') c = 'ì';
+		else if(c == 'Ï') c = 'ï';
+		else if(c == 'Î') c = 'î';
+		else if(c == 'Ó') c = 'ó';
+		else if(c == 'Ò') c = 'ò';
+		else if(c == 'Ö') c = 'ö';
+		else if(c == 'Ô') c = 'ô';
+		else if(c == 'Ú') c = 'ú';
+		else if(c == 'Ù') c = 'ù';
+		else if(c == 'Ü') c = 'ü';
+		else if(c == 'Û') c = 'û';
+		else if(c == 'Ý') c = 'ý';
+		else if(c == 'Ñ') c = 'ñ';
+		else if(c == 'Ç') c = 'ç';
+		else if(c == 'Ø') c = 'ø';
+		else if(c == 'Æ') c = 'æ';
+		else c = tolower(c);
 		
 		ret_formatted->append(1, c);
 		text++;
