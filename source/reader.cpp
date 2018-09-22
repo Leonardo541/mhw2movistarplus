@@ -38,7 +38,7 @@ void CReader::Seek(uint32_t size)
 		uint32_t needed = m_offset + size;
 		
 		if(needed > m_length)
-			throw "CReader::Seek()";
+			throw exception_t(false, true, "CReader::Seek()");
 		
 		m_offset = needed;
 	}
@@ -51,7 +51,7 @@ void CReader::Read(void *data, uint32_t size)
 		uint32_t needed = m_offset + size;
 		
 		if(needed > m_length)
-			throw "CReader::Read()";
+			throw exception_t(false, true, "CReader::Read()");
 		
 		memcpy(data, m_buffer + m_offset, size);
 		m_offset = needed;
