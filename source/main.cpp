@@ -403,7 +403,14 @@ bool mhw2_summaries(CFilter *filter)
 		if(summary != NULL)
 		{
 			if(formatting)
+			{
+				title.clear();
+				desc.clear();
+				season.clear();
+				episode.clear();
+				episode_num.clear();
 				set_title(title_full, desc_full, &title, &desc, &season, &episode, &episode_num);
+			}
 			
 			const char *title_text;
 			
