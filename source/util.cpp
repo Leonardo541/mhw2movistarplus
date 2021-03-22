@@ -101,8 +101,8 @@ void load_args(int argc, char *argv[], std::string *config_file, std::string *cr
 		printf("\n");
 		printf("Los argumentos obligatorios son las siguientes:\n");
 		printf("\n");
-		printf("  -c,  --config-file               Archivo de configuración\n");
-		printf("  -l,  --crossepg-lib              Archivo de librería de crossepg\n");
+		printf("  -c,  --config-file               Archivo de configuraciÃ³n\n");
+		printf("  -l,  --crossepg-lib              Archivo de librerÃ­a de crossepg\n");
 		printf("  -d,  --crossepg-data             Directorio de datos de crossepg\n");
 		printf("\n");
 		printf("Los argumentos opcionales son los siguientes:\n");
@@ -202,32 +202,32 @@ void load_config(const char *path, std::string *demux_path, std::string *title_f
 		fclose(file);
 		
 		if(demux_path->empty())
-			throw exception_t(true, true, "Error al leer el campo 'demux-path' desde el archivo de configuración");
+			throw exception_t(true, true, "Error al leer el campo 'demux-path' desde el archivo de configuraciÃ³n");
 		
 		if(title_format->empty())
-			throw exception_t(true, true, "Error al leer el campo 'title-format' desde el archivo de configuración");
+			throw exception_t(true, true, "Error al leer el campo 'title-format' desde el archivo de configuraciÃ³n");
 		
 		if(desc_format->empty())
-			throw exception_t(true, true, "Error al leer el campo 'desc-format' desde el archivo de configuración");
+			throw exception_t(true, true, "Error al leer el campo 'desc-format' desde el archivo de configuraciÃ³n");
 		
 		if(service_reference->empty())
-			throw exception_t(true, true, "Error al leer el campo 'service-reference' desde el archivo de configuración");
+			throw exception_t(true, true, "Error al leer el campo 'service-reference' desde el archivo de configuraciÃ³n");
 		
 		//if(webif_user->empty())
-		//	throw exception_t(true, true, "Error al leer el campo 'webif-user' desde el archivo de configuración");
+		//	throw exception_t(true, true, "Error al leer el campo 'webif-user' desde el archivo de configuraciÃ³n");
 		
 		//if(webif_pass->empty())
-		//	throw exception_t(true, true, "Error al leer el campo 'webif-pass' desde el archivo de configuración");
+		//	throw exception_t(true, true, "Error al leer el campo 'webif-pass' desde el archivo de configuraciÃ³n");
 		
 		if(*webif_port == 0)
-			throw exception_t(true, true, "Error al leer el campo 'webif-port' desde el archivo de configuración");
+			throw exception_t(true, true, "Error al leer el campo 'webif-port' desde el archivo de configuraciÃ³n");
 		
 		if(*max_retries == ~0)
-			throw exception_t(true, true, "Error al leer el campo 'max-retries' desde el archivo de configuración");
+			throw exception_t(true, true, "Error al leer el campo 'max-retries' desde el archivo de configuraciÃ³n");
 	}
 	else
 	{
-		throw exception_t(true, true, "Error al abrir el archivo de configuración");
+		throw exception_t(true, true, "Error al abrir el archivo de configuraciÃ³n");
 	}
 }
 
@@ -396,25 +396,20 @@ bool str_endswith(const char *text, uint32_t len, ...)
 
 const char *str_quote(const char *str)
 {
-	const char *ret = NULL;
-	
 	while(str[0] != '\0')
 	{
 		if(str[0] == '"')
 		{
-			if(ret != NULL)
-			{
-				ret = NULL;
-				break;
-			}
+			if(str[1] != ' ' && str[1] != '\0')
+				return str_quote(str + 1);
 			
-			ret = str;
+			return str;
 		}
 		
 		str++;
 	}
 	
-	return ret;
+	return NULL;
 }
 
 const char *str_trim(const char *text)
@@ -438,116 +433,210 @@ bool str_isnum(const char *text)
 	return true;
 }
 
-void set_title(const char *title_full, const char *desc_full, std::string *title, std::string *desc, std::string *ret_season, std::string *episode, std::string *ret_episode_num)
+bool str_isnum_or_isslash(const char *text)
 {
-	if(desc_full[0] == '"')
+	while(*text != '\0')
 	{
-		uint32_t idx = ~0;
-		uint32_t len = strlen(title_full);
+		if(!isdigit(*text) && *text != '/')
+			return false;
 		
-		const char *str = desc_full + 1;
-		
-		if(len >= 3 && title_full[len - 3] == '.' && title_full[len - 2] == '.' && title_full[len - 1] == '.')
+		text++;
+	}
+	
+	return true;
+}
+
+void set_desc(const char *desc_full, std::string *ret_title, std::string *ret_desc, std::string *ret_season, std::string *ret_episode, std::string *ret_episode_num)
+{
+	while(desc_full[0] == ' ')
+		desc_full++;
+	
+	uint32_t idx = 0;
+	
+	std::string ret;
+	
+	if(str_enclosed(desc_full, 'T', ' ', &ret) && str_isnum_or_isslash(ret.c_str()))
+	{
+		if(str_endswith(ret_title->c_str(), ret_title->length(), " (T", ret.c_str(), ")", NULL))
 		{
-			len -= 3;
+			ret_title->assign(ret_title->substr(0, ret_title->length() - ret.length() - 4));
+		}
+		
+		idx += ret.length() + 2;
+		
+		ret_season->assign("T");
+		ret_season->append(ret);
+		
+		if(strncmp(desc_full + idx, "Ep.", 3) == 0 && str_enclosed(desc_full + idx + 2, '.', ' ', &ret) && str_isnum(ret.c_str()))
+		{
+			idx += ret.length() + 4;
 			
-			if(strncmp(title_full, str, len) == 0)
+			ret_episode_num->assign(ret);
+		}
+	}
+	
+	ret_desc->assign(desc_full + idx);
+}
+
+void set_title(const char *title_text, const char *title_full, const char *desc_full, std::string *ret_title, std::string *ret_desc, std::string *ret_season, std::string *ret_episode, std::string *ret_episode_num)
+{
+	uint32_t title_text_length = strlen(title_text);
+	uint32_t title_full_length = strlen(title_full);
+	uint32_t desc_full_length = strlen(desc_full);
+	
+	if(title_text_length >= 3 && title_text[title_text_length - 3] == '.' && title_text[title_text_length - 2] == '.' && title_text[title_text_length - 1] == '.')
+	{
+		while(title_text_length != 0 && title_text[title_text_length - 1] == '.')
+			title_text_length--;
+	}
+	
+	if(title_full_length >= 3 && title_full[title_full_length - 3] == '.' && title_full[title_full_length - 2] == '.' && title_full[title_full_length - 1] == '.')
+	{
+		while(title_full_length != 0 && title_full[title_full_length - 1] == '.')
+			title_full_length--;
+		
+		if(desc_full[0] == '"')
+		{
+			const char *str = desc_full + 1;
+			
+			if(strncmp(title_full, str, title_full_length) == 0)
 			{
-				const char *end = str_quote(str + len);
-				
-				if(end != NULL)
+				if(strncmp(title_full, title_text, title_full_length < title_text_length ? title_full_length : title_text_length) == 0)
 				{
-					title->assign(str, (uint32_t)(end - str));
-					desc->assign(str_trim(end + 1));
-					
-					return;
-				}
-			}
-			else
-			{
-				if(len >= 2 && title_full[len - 2] == ':' || title_full[len - 1] == ' ')
-				{
-					idx  = 0;
-					len -= 2;
-				}
-				else if(len >= 1 && title_full[len - 1] == ':')
-				{
-					idx  = 0;
-					len -= 2;
-				}
-				else
-				{
-					for(uint32_t i = 2; i < len; i++)
-					{
-						if(title_full[i - 2] == ':' && title_full[i - 1] == ' ' && strncmp(title_full + i, str, len - i) == 0)
-						{
-							idx = len - i;
-							len = i - 2;
-							
-							break;
-						}
-					}
-				}
-				
-				if(idx != ~0)
-				{
-					const char *end = str_quote(str + idx);
+					const char *end = str_quote(str);
 					
 					if(end != NULL)
 					{
-						idx = (uint32_t)(end - str);
+						ret_title->assign(str, (uint32_t)(end - str));
+						ret_episode->assign("");
+						
+						return set_desc(end + 1, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
 					}
-					else
+				}
+				else
+				{
+					const char *end = str_quote(str);
+					
+					if(end != NULL)
 					{
-						idx = ~0;
+						ret_title->assign(title_text);
+						ret_episode->assign(str, (uint32_t)(end - str));
+						
+						return set_desc(end + 1, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
+					}
+				}
+			}
+			
+			uint32_t idx = ~0;
+			uint32_t len = title_full_length;
+			
+			if(len >= 2 && title_full[len - 2] == ':' && title_full[len - 1] == ' ')
+			{
+				idx  = 0;
+				len -= 2;
+			}
+			else if(len >= 1 && title_full[len - 1] == ':')
+			{
+				idx  = 0;
+				len -= 1;
+			}
+			else
+			{
+				for(uint32_t i = 2; i < len; i++)
+				{
+					if(title_full[i - 2] == ':' && title_full[i - 1] == ' ' && strncmp(title_full + i, str, len - i) == 0)
+					{
+						idx = len - i;
+						len = i - 2;
+						
+						break;
+					}
+				}
+			}
+			
+			if(idx != ~0)
+			{
+				const char *end = str_quote(str + idx);
+				
+				if(end != NULL)
+				{
+					ret_title->assign(title_full, len);
+					ret_episode->assign(str, (uint32_t)(end - str));
+					
+					return set_desc(end + 1, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
+				}
+			}
+		}
+		else
+		{
+			ret_title->assign(title_full);
+			ret_episode->assign("");
+			
+			return set_desc(desc_full, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
+		}
+	}
+	else
+	{
+		if(desc_full[0] == '"')
+		{
+			const char *str = desc_full + 1;
+			
+			if(strncmp(title_full, str, title_full_length) == 0 && str[title_full_length] == '"')
+			{
+				ret_title->assign(title_text);
+				ret_episode->assign(title_full);
+				
+				return set_desc(str + title_full_length + 1, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
+			}
+			
+			for(uint32_t i = 2; i < title_full_length; i++)
+			{
+				if(title_full[i - 2] == ':' && title_full[i - 1] == ' ')
+				{
+					uint32_t len = title_full_length - i;
+					
+					if(strncmp(title_full + i, str, len) == 0 && str[len] == '"')
+					{
+						ret_title->assign(title_full, i - 2);
+						ret_episode->assign(title_full + i);
+						
+						return set_desc(str + len + 1, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
 					}
 				}
 			}
 		}
 		else
 		{
-			for(uint32_t i = 2; i < len; i++)
+			if(strncmp(title_full, title_text, title_full_length < title_text_length ? title_full_length : title_text_length) == 0)
 			{
-				if(title_full[i - 2] == ':' && title_full[i - 1] == ' ' && strncmp(title_full + i, str, len - i) == 0 && str[len - i] == '"')
-				{
-					idx = len - i;
-					len = i - 2;
-					
-					break;
-				}
-			}
-		}
-		
-		if(idx != ~0)
-		{
-			episode->assign(str, idx);
-			
-			std::string ret;
-			
-			if(str_enclosed(str + idx + 1, ' ', ' ', &ret) && str_endswith(title_full, len, " (", ret.c_str(), ")", NULL))
-			{
-				len -= ret.length() + 3;
-				idx += ret.length() + 2;
+				ret_title->assign(title_full);
+				ret_episode->assign("");
 				
-				ret_season->assign(ret);
-				
-				if(strncmp(str + idx + 1, "Ep.", 3) == 0 && str_enclosed(str + idx + 3, '.', ' ', &ret) && str_isnum(ret.c_str()))
-				{
-					idx += ret.length() + 4;
-					
-					ret_episode_num->assign(ret);
-				}
+				return set_desc(desc_full, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
 			}
 			
-			title->assign(title_full, len);
-			desc->assign(str_trim(str + idx + 1));
-			
-			return;
+			for(uint32_t i = 2; i < title_full_length; i++)
+			{
+				if(title_full[i - 2] == ':' && title_full[i - 1] == ' ')
+				{
+					uint32_t len = title_full_length - i;
+					
+					if(strncmp(title_full + i, title_text, len) == 0)
+					{
+						ret_title->assign(title_full, i - 2);
+						ret_episode->assign(title_full + i);
+						
+						return set_desc(desc_full, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
+					}
+				}
+			}
 		}
 	}
 	
-	title->assign(title_full);
-	desc->assign(desc_full);
+	ret_title->assign(title_text);
+	ret_episode->assign(title_full);
+	
+	return set_desc(desc_full, ret_title, ret_desc, ret_season, ret_episode, ret_episode_num);
 }
 
 const char *fmt_close(const char *fmt, const char *code)
@@ -680,34 +769,52 @@ void fmt_upper(const char *text, std::string *ret_formatted)
 {
 	while(text[0] != '\0')
 	{
-		char c = text[0];
+		int c = text[0] & 0xFF;
 		
-		if(c == 'á') c = 'Á';
-		else if(c == 'à') c = 'À';
-		else if(c == 'ä') c = 'Ä';
-		else if(c == 'â') c = 'Â';
-		else if(c == 'é') c = 'É';
-		else if(c == 'è') c = 'È';
-		else if(c == 'ë') c = 'Ë';
-		else if(c == 'ê') c = 'Ê';
-		else if(c == 'í') c = 'Í';
-		else if(c == 'ì') c = 'Ì';
-		else if(c == 'ï') c = 'Ï';
-		else if(c == 'î') c = 'Î';
-		else if(c == 'ó') c = 'Ó';
-		else if(c == 'ò') c = 'Ò';
-		else if(c == 'ö') c = 'Ö';
-		else if(c == 'ô') c = 'Ô';
-		else if(c == 'ú') c = 'Ú';
-		else if(c == 'ù') c = 'Ù';
-		else if(c == 'ü') c = 'Ü';
-		else if(c == 'û') c = 'Û';
-		else if(c == 'ý') c = 'Ý';
-		else if(c == 'ñ') c = 'Ñ';
-		else if(c == 'ç') c = 'Ç';
-		else if(c == 'ø') c = 'Ø';
-		else if(c == 'æ') c = 'Æ';
-		else c = toupper(c);
+		switch(c)
+		{
+			case 0x9A: // Å¡ > Å 
+			case 0x9C: // Å“ > Å’
+			case 0x9E: // Å¾ > Å½
+				c -= 0x10;
+				break;
+			
+			case 0xE0: // Ã  > Ã€
+			case 0xE1: // Ã¡ > Ã
+			case 0xE2: // Ã¢ > Ã‚
+			case 0xE3: // Ã£ > Ãƒ
+			case 0xE4: // Ã¤ > Ã„
+			case 0xE5: // Ã¥ > Ã…
+			case 0xE6: // Ã¦ > Ã†
+			case 0xE7: // Ã§ > Ã‡
+			case 0xE8: // Ã¨ > Ãˆ
+			case 0xE9: // Ã© > Ã‰
+			case 0xEA: // Ãª > ÃŠ
+			case 0xEB: // Ã« > Ã‹
+			case 0xEC: // Ã¬ > ÃŒ
+			case 0xED: // Ã­ > Ã
+			case 0xEE: // Ã® > ÃŽ
+			case 0xEF: // Ã¯ > Ã
+			case 0xF0: // Ã > Ã°
+			case 0xF1: // Ã± > Ã‘
+			case 0xF2: // Ã² > Ã’
+			case 0xF3: // Ã³ > Ã“
+			case 0xF4: // Ã´ > Ã”
+			case 0xF5: // Ãµ > Ã•
+			case 0xF6: // Ã¶ > Ã–
+			case 0xF8: // Ã¸ > Ã˜
+			case 0xF9: // Ã¹ > Ã™
+			case 0xFA: // Ãº > Ãš
+			case 0xFB: // Ã» > Ã›
+			case 0xFC: // Ã¼ > Ãœ
+			case 0xFD: // Ã½ > Ã
+				c -= 0x20;
+				break;
+			
+			default:
+				c = toupper(c);
+				break;
+		}
 		
 		ret_formatted->append(1, c);
 		text++;
@@ -718,41 +825,59 @@ void fmt_lower(const char *text, std::string *ret_formatted)
 {
 	while(text[0] != '\0')
 	{
-		char c = text[0];
+		int c = text[0] & 0xFF;
 		
-		if(c == 'Á') c = 'á';
-		else if(c == 'À') c = 'à';
-		else if(c == 'Ä') c = 'ä';
-		else if(c == 'Â') c = 'â';
-		else if(c == 'É') c = 'é';
-		else if(c == 'È') c = 'è';
-		else if(c == 'Ë') c = 'ë';
-		else if(c == 'Ê') c = 'ê';
-		else if(c == 'Í') c = 'í';
-		else if(c == 'Ì') c = 'ì';
-		else if(c == 'Ï') c = 'ï';
-		else if(c == 'Î') c = 'î';
-		else if(c == 'Ó') c = 'ó';
-		else if(c == 'Ò') c = 'ò';
-		else if(c == 'Ö') c = 'ö';
-		else if(c == 'Ô') c = 'ô';
-		else if(c == 'Ú') c = 'ú';
-		else if(c == 'Ù') c = 'ù';
-		else if(c == 'Ü') c = 'ü';
-		else if(c == 'Û') c = 'û';
-		else if(c == 'Ý') c = 'ý';
-		else if(c == 'Ñ') c = 'ñ';
-		else if(c == 'Ç') c = 'ç';
-		else if(c == 'Ø') c = 'ø';
-		else if(c == 'Æ') c = 'æ';
-		else c = tolower(c);
+		switch(c)
+		{
+			case 0x8A: // Å  > Å¡
+			case 0x8C: // Å’ > Å“
+			case 0x8E: // Å½ > Å¾
+				c += 0x10;
+				break;
+			
+			case 0xC0: // Ã€ > Ã 
+			case 0xC1: // Ã > Ã¡
+			case 0xC2: // Ã‚ > Ã¢
+			case 0xC3: // Ãƒ > Ã£
+			case 0xC4: // Ã„ > Ã¤
+			case 0xC5: // Ã… > Ã¥
+			case 0xC6: // Ã† > Ã¦
+			case 0xC7: // Ã‡ > Ã§
+			case 0xC8: // Ãˆ > Ã¨
+			case 0xC9: // Ã‰ > Ã©
+			case 0xCA: // ÃŠ > Ãª
+			case 0xCB: // Ã‹ > Ã«
+			case 0xCC: // ÃŒ > Ã¬
+			case 0xCD: // Ã > Ã­
+			case 0xCE: // ÃŽ > Ã®
+			case 0xCF: // Ã > Ã¯
+			case 0xD0: // Ã° > Ã
+			case 0xD1: // Ã‘ > Ã±
+			case 0xD2: // Ã’ > Ã²
+			case 0xD3: // Ã“ > Ã³
+			case 0xD4: // Ã” > Ã´
+			case 0xD5: // Ã• > Ãµ
+			case 0xD6: // Ã– > Ã¶
+			case 0xD8: // Ã˜ > Ã¸
+			case 0xD9: // Ã™ > Ã¹
+			case 0xDA: // Ãš > Ãº
+			case 0xDB: // Ã› > Ã»
+			case 0xDC: // Ãœ > Ã¼
+			case 0xDD: // Ã > Ã½
+				c += 0x20;
+				break;
+			
+			default:
+				c = tolower(c);
+				break;
+		}
 		
 		ret_formatted->append(1, c);
 		text++;
 	}
 }
 
-void fmt_title(const char *fmt, const char *title_full, const char *desc_full, const char *title, const char *desc, const char *season, const char *episode, const char *episode_num, std::string *ret_formatted)
+void fmt_title(const char *fmt, const char *title_text, const char *title_full, const char *desc_full, const char *title, const char *desc, const char *season, const char *episode, const char *episode_num, std::string *ret_formatted)
 {
 	std::string params;
 	std::string options;
@@ -761,51 +886,60 @@ void fmt_title(const char *fmt, const char *title_full, const char *desc_full, c
 	
 	if(fmt_process(fmt, "if", true, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		
-		if(strcmp(params.c_str(), "title-full") == 0)
+		if(strcmp(params.c_str(), "title-text") == 0)
+		{
+			if(title_text[0] != '\0')
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		}
+		else if(strcmp(params.c_str(), "title-full") == 0)
 		{
 			if(title_full[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		else if(strcmp(params.c_str(), "desc-full") == 0)
 		{
 			if(desc_full[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		else if(strcmp(params.c_str(), "title") == 0)
 		{
 			if(title[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		else if(strcmp(params.c_str(), "desc") == 0)
 		{
 			if(desc[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		else if(strcmp(params.c_str(), "season") == 0)
 		{
 			if(season[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		else if(strcmp(params.c_str(), "episode") == 0)
 		{
 			if(episode[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		else if(strcmp(params.c_str(), "episode-num") == 0)
 		{
 			if(episode_num[0] != '\0')
-				fmt_title(options.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+				fmt_title(options.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		}
 		
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "upper", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		
-		if(strcmp(params.c_str(), "title-full") == 0)
+		if(strcmp(params.c_str(), "title-text") == 0)
+		{
+			fmt_upper(title_text, ret_formatted);
+		}
+		else if(strcmp(params.c_str(), "title-full") == 0)
 		{
 			fmt_upper(title_full, ret_formatted);
 		}
@@ -834,13 +968,17 @@ void fmt_title(const char *fmt, const char *title_full, const char *desc_full, c
 			fmt_upper(episode_num, ret_formatted);
 		}
 		
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "lower", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		
-		if(strcmp(params.c_str(), "title-full") == 0)
+		if(strcmp(params.c_str(), "title-text") == 0)
+		{
+			fmt_lower(title_text, ret_formatted);
+		}
+		else if(strcmp(params.c_str(), "title-full") == 0)
 		{
 			fmt_lower(title_full, ret_formatted);
 		}
@@ -869,49 +1007,55 @@ void fmt_title(const char *fmt, const char *title_full, const char *desc_full, c
 			fmt_lower(episode_num, ret_formatted);
 		}
 		
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+	}
+	else if(fmt_process(fmt, "title-text", false, &params, &options, &prevfmt, &nextfmt))
+	{
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		ret_formatted->append(title_text);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "title-full", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(title_full);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "desc-full", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(desc_full);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "title", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(title);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "desc", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(desc);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "season", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(season);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "episode", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(episode);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else if(fmt_process(fmt, "episode-num", false, &params, &options, &prevfmt, &nextfmt))
 	{
-		fmt_title(prevfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(prevfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 		ret_formatted->append(episode_num);
-		fmt_title(nextfmt.c_str(), title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
+		fmt_title(nextfmt.c_str(), title_text, title_full, desc_full, title, desc, season, episode, episode_num, ret_formatted);
 	}
 	else
 	{

@@ -53,18 +53,19 @@ typedef struct buf_s
 typedef struct summary_s
 {
 	epgdb_title_t *title;
+	char title_text[64];
 	struct summary_s *next;
 	
-	summary_s(epgdb_title_t *t, struct summary_s *n)
+	summary_s(epgdb_title_t *t, const char *t_text, struct summary_s *n)
 	{
 		title = t;
+		strcpy(title_text, t_text);
 		next = n;
 	}
 	
 	~summary_s()
 	{
-		if(next != NULL)
-			delete next;
+		
 	}
 } summary_t;
 
@@ -86,7 +87,16 @@ void bufs_clear()
 void summaries_clear()
 {
 	for(std::vector<summary_t *>::iterator it = summaries_titles.begin(); it != summaries_titles.end(); it++)
-		delete (*it);
+	{
+		summary_t *summary = *it;
+		
+		while(summary != NULL)
+		{
+			summary_t *summary_next = summary->next;
+			delete summary;
+			summary = summary_next;
+		}
+	}
 	
 	summaries.clear();
 	summaries_titles.clear();
@@ -248,6 +258,7 @@ void mhw2_titles(CFilter *filter)
 			uint16_t mjd, duration;
 			uint8_t hours, minutes, seconds;
 			uint8_t title_length;
+			char title_text[64];
 			uint16_t summary_id;
 			
 			reader.Read(channel_id);
@@ -259,9 +270,26 @@ void mhw2_titles(CFilter *filter)
 			reader.Read(seconds);
 			reader.Read(duration);
 			reader.Read(title_length);
-			reader.Seek(title_length & 0x3F);
+			reader.Read(title_text, title_length & 0x3F);
 			reader.Seek(1);
 			reader.Read(summary_id);
+			
+			title_text[title_length & 0x3F] = '\0';
+			
+			char *hd_str = strstr(title_text, "(HD)");
+			
+			if(hd_str != NULL)
+			{
+				uint32_t hd_len = 4;
+				
+				if(hd_str != title_text && hd_str[-1] == ' ')
+				{
+					hd_str--;
+					hd_len++;
+				}
+				
+				strcpy(hd_str, hd_str + hd_len);
+			}
 			
 			if(titles.find(title_id) == titles.end())
 			{
@@ -284,7 +312,7 @@ void mhw2_titles(CFilter *filter)
 						summaries_count++;
 					}
 					
-					summaries_titles[summary_id] = new summary_t(title, summaries_titles[summary_id]);
+					summaries_titles[summary_id] = new summary_t(title, title_text, summaries_titles[summary_id]);
 				}
 			}
 		}
@@ -409,7 +437,7 @@ bool mhw2_summaries(CFilter *filter)
 				season.clear();
 				episode.clear();
 				episode_num.clear();
-				set_title(title_full, desc_full, &title, &desc, &season, &episode, &episode_num);
+				set_title(summary->title_text, title_full, desc_full, &title, &desc, &season, &episode, &episode_num);
 			}
 			
 			const char *title_text;
@@ -417,7 +445,7 @@ bool mhw2_summaries(CFilter *filter)
 			if(title_formatting)
 			{
 				title_formatted.clear();
-				fmt_title(title_format.c_str(), title_full, desc_full, title.c_str(), desc.c_str(), season.c_str(), episode.c_str(), episode_num.c_str(), &title_formatted);
+				fmt_title(title_format.c_str(), summary->title_text, title_full, desc_full, title.c_str(), desc.c_str(), season.c_str(), episode.c_str(), episode_num.c_str(), &title_formatted);
 				title_text = title_formatted.c_str();
 			}
 			else
@@ -430,7 +458,7 @@ bool mhw2_summaries(CFilter *filter)
 			if(desc_formatting)
 			{
 				desc_formatted.clear();
-				fmt_title(desc_format.c_str(), title_full, desc_full, title.c_str(), desc.c_str(), season.c_str(), episode.c_str(), episode_num.c_str(), &desc_formatted);
+				fmt_title(desc_format.c_str(), summary->title_text, title_full, desc_full, title.c_str(), desc.c_str(), season.c_str(), episode.c_str(), episode_num.c_str(), &desc_formatted);
 				desc_text = desc_formatted.c_str();
 			}
 			else
@@ -442,10 +470,12 @@ bool mhw2_summaries(CFilter *filter)
 			{
 				epgdb_titles_set_description(summary->title, title_text);
 				epgdb_titles_set_long_description(summary->title, desc_text);
-				summary = summary->next;
+				
+				summary_t *summary_next = summary->next;
+				delete summary;
+				summary = summary_next;
 			}
 			
-			delete summaries_titles[summary_id];
 			summaries_titles[summary_id] = NULL;
 		}
 	}
